@@ -16,3 +16,4 @@ Um outro ponto é a ideia de utilizar outras componentes principais para constru
     
     Ler mais sobre covariance estimate and robust covariance estimate LedoitWolf vs OAS vs Empirico. É mais performático e menos vulnerável a erros. Verificar como o **Gaussian Mixture Model** estima a covariância de cada gaussiana
     
+
