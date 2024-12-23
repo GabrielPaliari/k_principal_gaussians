@@ -1,6 +1,9 @@
 from KPrincipalGaussiansClassifier import KPrincipalGaussiansClassifier, MetaParams
 import pandas as pd
-import numpy as np
+
+variance_perc_threshold=0.95
+model_name = f"mahalanobis_class-specific_{ variance_perc_threshold * 100 }"
+print("model name: ", model_name)
 
 def load_data(file_path): 
     print("loading data")
@@ -12,21 +15,10 @@ def load_data(file_path):
     
     return train_data, labels
 
+class_components_weights = [1.2,1,1,1,1,1,1,1.2,1.1,1.15]
 train_data_file_path = 'C:/src/data_analysis/data/digit-recognizer/train.csv'
 train_data, labels = load_data(train_data_file_path)
-meta_params = MetaParams(num_classes=10, n_init=1, tol=1e-3)
+meta_params = MetaParams(num_classes=10,class_components_weights=class_components_weights, n_init=1,tol=1e-4,variance_perc_threshold=0.95,k_near_centroids=5) 
 
 k_prin_gauss_model = KPrincipalGaussiansClassifier(meta_params=meta_params)
 k_prin_gauss_model.fit(train_data=train_data, labels=labels)
-num_samples = 1
-validation_data = train_data[:num_samples,:]
-labels_v = labels[:num_samples]
-
-predictions = k_prin_gauss_model.predict(validation_data)
-
-import time
-start_time = time.time()
-print(len(predictions[labels_v == predictions]) / 1)
-end_time = time.time()
-
-print(f"Time taken to run the function: {end_time - start_time}")

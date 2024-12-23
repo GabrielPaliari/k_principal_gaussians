@@ -27,7 +27,7 @@ def euclidean_distance_to_segment(P, A, B):
     distance = np.linalg.norm(P - Q)
     return distance
 
-def mahalanobis_distance(x, mean, cov):
+def mahalanobis_distance(x, mean, precision):
     import numpy as np
     """
     Calcula a distância de Mahalanobis de um ponto para uma distribuição gaussiana.
@@ -41,6 +41,5 @@ def mahalanobis_distance(x, mean, cov):
     - Distância de Mahalanobis (float).
     """
     delta = x - mean
-    inv_cov = np.linalg.inv(cov)
-    dist = np.sqrt(np.dot(np.dot(delta.T, inv_cov), delta))
+    dist = np.sqrt(np.dot(np.dot(delta.T, precision), delta))
     return dist

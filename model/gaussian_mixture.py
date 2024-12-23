@@ -1,6 +1,8 @@
 from sklearn.mixture import BayesianGaussianMixture
 from MetaParams import default_meta_params
-def fit_gaussian_mixture(data, k_segments_per_class=100, meta_params=default_meta_params):
+import numpy as np
+
+def fit_gaussian_mixture(class_data, k_segments_per_class=100, ideal_k_class_specific=50, meta_params=default_meta_params):
     """
     Approximate a principal curve using a Gaussian Mixture Model.
     
@@ -16,7 +18,7 @@ def fit_gaussian_mixture(data, k_segments_per_class=100, meta_params=default_met
     - curve: np.ndarray, shape (n_points, n_features)
       The computed principal curve.
     """
-    gaussian_mixture_model = BayesianGaussianMixture(
+    gmm = BayesianGaussianMixture(
         n_components=k_segments_per_class,
         max_iter=meta_params.max_iter,
         covariance_type=meta_params.covariance_type,
@@ -28,5 +30,18 @@ def fit_gaussian_mixture(data, k_segments_per_class=100, meta_params=default_met
         n_init=meta_params.n_init,
         warm_start=meta_params.warm_start,
     )
-    gaussian_mixture_model.fit(data)
-    return gaussian_mixture_model
+    gmm.fit(class_data)
+    
+    means = gmm.means_
+    precisions = gmm.precisions_
+    weights = gmm.weights_
+    idx_weigths_desc = np.argsort(weights)[::-1]
+    means_sorted = means[idx_weigths_desc]
+    precisions_sorted = precisions[idx_weigths_desc]
+    
+    num_indexes_to_exclude = k_segments_per_class - ideal_k_class_specific
+    indexes_to_exclude = []
+    if (num_indexes_to_exclude > 0):
+      indexes_to_exclude = idx_weigths_desc[-int(num_indexes_to_exclude):]
+    
+    return means_sorted, precisions_sorted, indexes_to_exclude

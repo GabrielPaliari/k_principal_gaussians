@@ -7,17 +7,16 @@ from gaussian_mixture import fit_gaussian_mixture
 from segments_generator import create_segs_from_model
 from search_optimization import create_hnsw_from_centroids, find_closest_segments
 from MetaParams import MetaParams, default_meta_params
-from model.distance import euclidean_distance_to_segment
 from tqdm import tqdm   
-
+from distance import mahalanobis_distance
 class KPrincipalGaussiansClassifier:
     def __init__(self, meta_params=default_meta_params):
         self.meta_params=meta_params
-        self.all_centroids = []
-        self.all_segments = []
-        self.all_pc2_variances = []
-        self.all_weights = []
+        self.all_means = []
+        self.all_precisions = []
+        self.all_indexes_to_exclude = []
         self.num_classes=meta_params.num_classes
+        self.class_components_weights=meta_params.class_components_weights
 
     def fit(self, train_data, labels):
         self.train_data=train_data
@@ -37,63 +36,64 @@ class KPrincipalGaussiansClassifier:
         return pca, k_segments_per_class
 
     def __fit_gaussian_mixture_models(self):
-        all_centroids = []
-        all_segments = []
-        all_pc2_variances = []
-        all_weights = []
+        all_means = []
+        all_precisions = []
+        all_indexes_to_exclude = []
         for class_idx in range(self.num_classes):
             print(f"Treinando GaussianMixture para a classe: {class_idx}")
-
-            class_data = self.train_data[self.labels == class_idx]
-            processed_data = self.pca.transform(class_data)
-            gmm = fit_gaussian_mixture(data=processed_data, k_segments_per_class=self.k_segments_per_class, meta_params=self.meta_params)
+            original_class_data = self.train_data[self.labels == class_idx]
             
-            centroids = gmm.means_
-            weights = gmm.weights_
-            segments, pc2_variances = create_segs_from_model(centroids, gmm.covariances_, meta_params=self.meta_params)
+            "Note que são 2 PCAs diferentes, um global e um da classe, usado para desconsiderar componentes das gaussianas"
+            class_pca, ideal_k_class_specific = reduce_dim_PCA(original_class_data, self.meta_params)
+            print(f"K componentes ideal para classe {class_idx}: {ideal_k_class_specific}")
+            ideal_k_class_specific = ideal_k_class_specific * self.class_components_weights[class_idx]
             
-            all_centroids.extend(centroids)
-            all_weights.extend(weights)
-            all_segments.extend(segments)
-            all_pc2_variances.extend(pc2_variances)
+            processed_class_data = self.pca.transform(original_class_data)
+            class_pca.fit(original_class_data)
             
-        self.all_weights = np.array(all_weights)
-        self.all_centroids = np.array(all_centroids)
-        self.all_segments = np.array(all_segments)
-        self.all_pc2_variances = np.array(all_pc2_variances)
-    
+            means, precisions, indexes_to_exclude = fit_gaussian_mixture(class_data=processed_class_data, k_segments_per_class=self.k_segments_per_class, ideal_k_class_specific=ideal_k_class_specific, meta_params=self.meta_params)
+            
+            all_means.extend(means)
+            all_precisions.extend(precisions)
+            all_indexes_to_exclude.extend(indexes_to_exclude + class_idx * self.k_segments_per_class)
+        self.all_means = np.array(all_means)
+        self.all_precisions = np.array(all_precisions)
+        self.all_indexes_to_exclude = np.array(indexes_to_exclude)
+        
     def __create_search_optimization(self):
-        self.hnsw = create_hnsw_from_centroids(all_centroids=self.all_centroids, meta_params=self.meta_params)
+        self.hnsw = create_hnsw_from_centroids(
+            all_means=self.all_means,
+            excluded_indexes=self.all_indexes_to_exclude,
+            meta_params=self.meta_params
+        )
     
-    def predict(self, points, weight_pow=0.5, variance_pow=0.5):      
+    def predict(self, points):      
         transformed_points = self.pca.transform(points)
         predictions = np.zeros(points.shape[0])
-        for idx, point in tqdm(enumerate(transformed_points), ncols=80):
+        for idx  in tqdm(range(len(transformed_points)), ncols=80):
+            point = transformed_points[idx]
             closest_segs_idx = find_closest_segments(hnsw=self.hnsw, point=point, metaparams=self.meta_params)        
-            best_index = self.__validate_segments_with_weights(point=point, indices=closest_segs_idx, weight_pow=weight_pow, variance_pow=variance_pow)
+            best_index = self.__validate_segments_with_weights(point=point, indices=closest_segs_idx)
             class_predicted = best_index // (self.k_segments_per_class)
             predictions[idx] = class_predicted
         return predictions.astype(int) 
         
-    def __validate_segments_with_weights(self, point, indices, variance_pow=0.5):
+    def __validate_segments_with_weights(self, point, indices):
         """
         Valida os segmentos considerando as distâncias ajustadas com PCA2 e os pesos das gaussianas.
         
         segment_weights: array contendo os pesos das gaussianas associadas aos segmentos.
         """
-        min_adjusted_distance = float('inf')
+        min_distance = float('inf')
         best_index = -1
 
         for idx in indices:
-            A, B = self.all_segments[idx]
-            distance = euclidean_distance_to_segment(P=point, A=A, B=B)
+            mean = self.all_means[idx]
+            prec = self.all_precisions[idx]
+            distance = mahalanobis_distance(x=point, mean=mean, precision=prec)
             
-            # Ajustar distância com PCA2 e peso gaussiano
-            variance_weight = self.all_pc2_variances[idx] ** variance_pow
-            adjusted_distance = distance / variance_weight
-            
-            if adjusted_distance < min_adjusted_distance:
-                min_adjusted_distance = adjusted_distance
+            if distance < min_distance:
+                min_distance = distance
                 best_index = idx
 
         return best_index

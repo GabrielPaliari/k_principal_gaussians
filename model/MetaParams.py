@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+import numpy as np
 
 class MetricType(Enum):
     EUCLIDEAN = 'l2'
@@ -10,7 +11,7 @@ class MetricType(Enum):
 class MetaParams:
     # Global
     num_classes: int = 10
-
+    class_components_weights: np.ndarray = np.ones(10)
     # PCA pre processing
     variance_perc_threshold: float = 0.95
 

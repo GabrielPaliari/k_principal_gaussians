@@ -2,7 +2,7 @@ import hnswlib
 from MetaParams import default_meta_params
 import numpy as np
     
-def create_hnsw_from_centroids(all_centroids, meta_params):
+def create_hnsw_from_centroids(all_means, excluded_indexes, meta_params):
     """
     Cria uma HNSW (Hierarchical Navigable Small World) para busca aproximada.
     centroids: array de forma (n, d), onde n é o número de segmentos e d é a dimensionalidade.
@@ -12,7 +12,7 @@ def create_hnsw_from_centroids(all_centroids, meta_params):
     Retorna:
     - hnsw: índice HNSW criado a partir dos centroides dos segmentos.
     """
-    num_elements, dim = all_centroids.shape
+    num_elements, dim = all_means.shape
 
     # Inicializar índice HNSW
     hnsw = hnswlib.Index(space='l2', dim=dim)
@@ -22,11 +22,11 @@ def create_hnsw_from_centroids(all_centroids, meta_params):
         M=meta_params.M,
     )
 
-    # Adicionar os centroides ao índice
-    hnsw.add_items(all_centroids)
-
-    # Ajustar ef para busca
+    hnsw.add_items(all_means)
     hnsw.set_ef(meta_params.ef)
+    
+    for idx in excluded_indexes:
+        hnsw.mark_deleted(idx)
 
     return hnsw
 
