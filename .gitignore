@@ -1,1 +1,3 @@
-venv/
+model/99_confidence.npy
+/venv
+/models_storage

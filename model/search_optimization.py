@@ -15,7 +15,7 @@ def create_hnsw_from_centroids(all_means, excluded_indexes, meta_params):
     num_elements, dim = all_means.shape
 
     # Inicializar índice HNSW
-    hnsw = hnswlib.Index(space='l2', dim=dim)
+    hnsw = hnswlib.Index(space='ip', dim=dim)
     hnsw.init_index(
         max_elements=num_elements, 
         ef_construction=meta_params.ef, 
