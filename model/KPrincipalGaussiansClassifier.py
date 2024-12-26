@@ -4,7 +4,6 @@ IMPORTS
 import numpy as np
 from pre_processing import reduce_dim_PCA
 from gaussian_mixture import fit_gaussian_mixture
-from segments_generator import create_segs_from_model
 from search_optimization import create_hnsw_from_centroids, find_closest_segments
 from MetaParams import MetaParams, default_meta_params
 from tqdm import tqdm   
@@ -44,12 +43,11 @@ class KPrincipalGaussiansClassifier:
             original_class_data = self.train_data[self.labels == class_idx]
             
             "Note que são 2 PCAs diferentes, um global e um da classe, usado para desconsiderar componentes das gaussianas"
-            class_pca, ideal_k_class_specific = reduce_dim_PCA(original_class_data, self.meta_params)
-            print(f"K componentes ideal para classe {class_idx}: {ideal_k_class_specific}")
+            class_pca, ideal_k_class_specific = reduce_dim_PCA(original_class_data, MetaParams(variance_perc_threshold=0.7))
             ideal_k_class_specific = ideal_k_class_specific * self.class_components_weights[class_idx]
+            print(f"K componentes ideal para classe {class_idx}: {ideal_k_class_specific}")
             
             processed_class_data = self.pca.transform(original_class_data)
-            class_pca.fit(original_class_data)
             
             means, precisions, indexes_to_exclude = fit_gaussian_mixture(class_data=processed_class_data, k_segments_per_class=self.k_segments_per_class, ideal_k_class_specific=ideal_k_class_specific, meta_params=self.meta_params)
             

@@ -15,7 +15,7 @@ def create_hnsw_from_centroids(all_means, excluded_indexes, meta_params):
     num_elements, dim = all_means.shape
 
     # Inicializar índice HNSW
-    hnsw = hnswlib.Index(space='ip', dim=dim)
+    hnsw = hnswlib.Index(space='l2', dim=dim)
     hnsw.init_index(
         max_elements=num_elements, 
         ef_construction=meta_params.ef, 
@@ -44,6 +44,21 @@ def find_closest_segments(hnsw, point, metaparams=default_meta_params):
     k_near_centroids=metaparams.k_near_centroids
     indices, _ = hnsw.knn_query(point, k=k_near_centroids)  # Busca os k centroides mais próximos
     return indices.reshape(-1)
+
+def find_closest_gaussians_and_distances(hnsw, point, metaparams=default_meta_params):
+    """
+    Encontra os segmentos mais próximos de um ponto com base nos seus centroides usando HNSW.
+    hnsw: índice HNSW criado a partir dos centroides. 
+    point: array de forma (d,), representando o ponto de interesse.
+    k: número de segmentos candidatos a retornar. 
+        Note que a busca utiliza os centroides como referência, o que diminui a precisão. A projeção a cada segmento será calculada depois
+
+    Retorna:
+    - indices: índices dos segmentos mais próximos.
+    """
+    k_near_centroids=metaparams.k_near_centroids
+    indices, distances = hnsw.knn_query(point, k=k_near_centroids)  # Busca os k centroides mais próximos
+    return indices.reshape(-1), distances 
 
 # Atualmente não iremos utilizar este algoritmo, mas pode ser usado para encontrar o k ideal para cada região
 def determine_k_segments_dinamically(hnsw, point, max_k=50, cv_threshold=0.2):
